@@ -1,8 +1,12 @@
 module github.com/BolajiOlajide/pgx-poc-db-store
 
-go 1.20
+go 1.21
+
+toolchain go1.21.5
 
 require (
+	clevergo.tech/jsend v1.1.3
+	github.com/go-chi/chi/v5 v5.0.11
 	github.com/jackc/pgx/v5 v5.5.1
 	github.com/rubenv/sql-migrate v1.6.0
 )
