@@ -20,6 +20,14 @@ func newServer(db database.DB, r *chi.Mux) *server {
 	}
 }
 
+func (s *server) start() {
+	http.ListenAndServe(":3000", s.router)
+}
+
+func (s *server) gracefulShutdown() {
+	s.db.Close()
+}
+
 func (s *server) setupRoutes() {
 	s.router.Get("/", s.rootHandler)
 	s.router.Route("/people", func(ir chi.Router) {

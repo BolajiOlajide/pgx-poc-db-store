@@ -2,10 +2,10 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
-	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/BolajiOlajide/pgx-poc-db-store/internal/database"
 	"github.com/go-chi/chi/v5"
@@ -14,13 +14,12 @@ import (
 )
 
 func main() {
-	logger := log.New(os.Stdout, "pgx-testrunner", log.LstdFlags)
+	logger := log.New(os.Stdout, "pgx-testrunner: ", log.LstdFlags)
 	ctx := context.Background()
 
 	db := database.New(ctx, logger)
 
 	runMigrations(db, logger)
-	fmt.Println("hey hey hey!")
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
@@ -28,17 +27,32 @@ func main() {
 	s := newServer(db, r)
 	s.setupRoutes()
 
-	http.ListenAndServe(":3000", r)
+	// Create a channel to receive the interrupt signal
+	interruptChan := make(chan os.Signal, 1)
+
+	// Notify the channel for the interrupt signal
+	signal.Notify(interruptChan, os.Interrupt, syscall.SIGTERM)
+
+	go s.start()
+
+	<-interruptChan
+
+	s.gracefulShutdown()
+	logger.Println("Server stopped gracefully")
 }
 
 func runMigrations(db database.DB, logger *log.Logger) {
 	migrations := &migrate.FileMigrationSource{
 		Dir: "migrations",
 	}
-	n, err := migrate.Exec(db.GetSQLDB(), "postgres", migrations, migrate.Up)
+
+	sdb := db.GetSQLDB()
+	defer sdb.Close()
+
+	n, err := migrate.Exec(sdb, "postgres", migrations, migrate.Up)
 	if err != nil {
 		logger.Println("error running migrations:", err)
 		os.Exit(1)
 	}
-	log.Printf("Applied %d migrations!\n", n)
+	logger.Printf("Applied %d migrations!\n", n)
 }

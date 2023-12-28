@@ -22,6 +22,8 @@ type DB interface {
 
 	GetSQLDB() *sql.DB
 
+	Close()
+
 	// Users() UserStore
 	// People() PeopleStore
 }
@@ -29,6 +31,10 @@ type DB interface {
 type db struct {
 	pool   *pgxpool.Pool
 	logger *log.Logger
+}
+
+func (d *db) Close() {
+	d.pool.Close()
 }
 
 func (d *db) acquire(ctx context.Context) (*pgxpool.Conn, func(), error) {
@@ -85,18 +91,18 @@ func New(ctx context.Context, logger *log.Logger) DB {
 	// Create database connection
 	connPool, err := pgxpool.NewWithConfig(ctx, createPgxPoolConfig(logger))
 	if err != nil {
-		log.Fatal("Error while creating connection to the database!!")
+		logger.Fatal("Error while creating connection to the database!!")
 	}
 
 	conn, err := connPool.Acquire(ctx)
 	if err != nil {
-		log.Fatal("Error while acquiring connection to the database!!")
+		logger.Fatal("Error while acquiring connection to the database!!")
 	}
 	defer conn.Release()
 
 	err = conn.Ping(ctx)
 	if err != nil {
-		log.Fatal("Error while pinging the database!!")
+		logger.Fatal("Error while pinging the database!!")
 	}
 
 	return &db{
@@ -119,7 +125,7 @@ func createPgxPoolConfig(logger *log.Logger) *pgxpool.Config {
 
 	dbConfig, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
-		log.Fatal("Failed to create a config, error: ", err)
+		logger.Fatal("Failed to create a config, error: ", err)
 	}
 
 	dbConfig.MaxConns = defaultMaxConns
@@ -130,17 +136,17 @@ func createPgxPoolConfig(logger *log.Logger) *pgxpool.Config {
 	dbConfig.ConnConfig.ConnectTimeout = defaultConnectTimeout
 
 	dbConfig.BeforeAcquire = func(ctx context.Context, c *pgx.Conn) bool {
-		log.Println("Before acquiring the connection pool to the database!!")
+		logger.Println("Before acquiring the connection pool to the database!!")
 		return true
 	}
 
 	dbConfig.AfterRelease = func(c *pgx.Conn) bool {
-		log.Println("After releasing the connection pool to the database!!")
+		logger.Println("After releasing the connection pool to the database!!")
 		return true
 	}
 
 	dbConfig.BeforeClose = func(c *pgx.Conn) {
-		log.Println("Closed the connection pool to the database!!")
+		logger.Println("Closed the connection pool to the database!!")
 	}
 
 	return dbConfig
