@@ -21,7 +21,7 @@ type DB interface {
 	Exec(ctx context.Context, query string, args ...any) (pgconn.CommandTag, error)
 	QueryRow(ctx context.Context, query string, args ...any) (pgx.Row, error)
 
-	// Users() UserStore
+	Users() UserStore
 	// People() PeopleStore
 
 	WithTransact(context.Context, func(tx DB) error) error
@@ -32,7 +32,6 @@ type DB interface {
 var _ DB = (*db)(nil)
 
 func New(ctx context.Context, logger *log.Logger) DB {
-	// Create database connection
 	connPool, err := pgxpool.NewWithConfig(ctx, createPgxPoolConfig(logger))
 	if err != nil {
 		logger.Fatal("Error while creating connection to the database!!")
@@ -52,5 +51,6 @@ func New(ctx context.Context, logger *log.Logger) DB {
 	return &db{
 		pool:   connPool,
 		logger: logger,
+		Store:  basestore.NewWithHandle(basestore.NewHandleWithDB(logger, connPool, pgx.TxOptions{})),
 	}
 }

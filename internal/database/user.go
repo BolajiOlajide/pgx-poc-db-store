@@ -11,6 +11,8 @@ import (
 	"github.com/keegancsmith/sqlf"
 )
 
+const defaultUserLimit = 10
+
 var userColumns = []*sqlf.Query{
 	sqlf.Sprintf("users.id"),
 	sqlf.Sprintf("users.username"),
@@ -46,6 +48,7 @@ var _ UserStore = &userStore{}
 
 const listUsersFmtStr = `
 SELECT %s FROM users
+LIMIT %s
 `
 
 func (u *userStore) List(ctx context.Context, opts ListUserArgs) ([]*types.User, error) {
@@ -60,7 +63,17 @@ func (u *userStore) List(ctx context.Context, opts ListUserArgs) ([]*types.User,
 		return nil
 	}
 
-	rows, err := u.Query(ctx, sqlf.Sprintf(listUsersFmtStr, sqlf.Join(userColumns, ", ")))
+	if opts.Limit == 0 {
+		opts.Limit = defaultUserLimit
+	}
+
+	query := sqlf.Sprintf(
+		listUsersFmtStr,
+		sqlf.Join(userColumns, ", "),
+		opts.Limit,
+	)
+
+	rows, err := u.Query(ctx, query)
 	if err != nil {
 		return nil, err
 	}

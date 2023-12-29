@@ -51,7 +51,12 @@ func (s *server) getPeople(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) getUsers(w http.ResponseWriter, r *http.Request) {
-	jsend.Success(w, "hello users", http.StatusOK)
+	users, err := s.db.Users().List(r.Context(), database.ListUserArgs{})
+	if err != nil {
+		jsend.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	jsend.Success(w, users, http.StatusOK)
 }
 
 func (s *server) getUser(w http.ResponseWriter, r *http.Request) {

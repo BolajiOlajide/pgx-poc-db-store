@@ -72,3 +72,7 @@ func (d *db) WithTransact(ctx context.Context, f func(tx DB) error) error {
 		return f(&db{logger: d.logger, Store: tx})
 	})
 }
+
+func (d *db) Users() UserStore {
+	return UsersWith(d.Store)
+}
