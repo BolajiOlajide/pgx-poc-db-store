@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/BolajiOlajide/pgx-poc-db-store/internal/database/basestore"
 	"github.com/BolajiOlajide/pgx-poc-db-store/internal/database/dbutil"
@@ -12,6 +13,14 @@ import (
 )
 
 const defaultUserLimit = 10
+
+type UserNotFoundErr struct {
+	ID string
+}
+
+func (e *UserNotFoundErr) Error() string {
+	return fmt.Sprintf("user with ID %s not found", e.ID)
+}
 
 var userColumns = []*sqlf.Query{
 	sqlf.Sprintf("users.id"),
@@ -52,17 +61,6 @@ LIMIT %s
 `
 
 func (u *userStore) List(ctx context.Context, opts ListUserArgs) ([]*types.User, error) {
-	var users []*types.User
-
-	scanUserFunc := func(rows pgx.Rows) error {
-		user, err := scanUser(rows)
-		if err != nil {
-			return err
-		}
-		users = append(users, user)
-		return nil
-	}
-
 	if opts.Limit == 0 {
 		opts.Limit = defaultUserLimit
 	}
@@ -78,6 +76,17 @@ func (u *userStore) List(ctx context.Context, opts ListUserArgs) ([]*types.User,
 		return nil, err
 	}
 	defer rows.Close()
+
+	users := []*types.User{}
+
+	scanUserFunc := func(rows pgx.Rows) error {
+		user, err := scanUser(rows)
+		if err != nil {
+			return err
+		}
+		users = append(users, user)
+		return nil
+	}
 
 	for rows.Next() {
 		if err := scanUserFunc(rows); err != nil {
@@ -104,12 +113,14 @@ func (u *userStore) Get(ctx context.Context, userID string) (*types.User, error)
 		sqlf.Sprintf("id = %s", userID),
 	)
 
-	row, err := u.QueryRow(ctx, q)
+	user, err := scanUser(u.QueryRow(ctx, q))
 	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, &UserNotFoundErr{ID: userID}
+		}
 		return nil, err
 	}
-
-	return scanUser(row)
+	return user, nil
 }
 
 func scanUser(sc dbutil.Scanner) (*types.User, error) {

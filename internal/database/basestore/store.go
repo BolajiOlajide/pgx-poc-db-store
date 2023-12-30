@@ -59,7 +59,7 @@ func (s *Store) Query(ctx context.Context, query *sqlf.Query) (pgx.Rows, error) 
 }
 
 // QueryRow performs QueryRowContext on the underlying connection.
-func (s *Store) QueryRow(ctx context.Context, query *sqlf.Query) (pgx.Row, error) {
+func (s *Store) QueryRow(ctx context.Context, query *sqlf.Query) pgx.Row {
 	return s.handle.QueryRow(ctx, query.Query(sqlf.PostgresBindVar), query.Args()...)
 }
 

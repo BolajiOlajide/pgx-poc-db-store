@@ -19,7 +19,7 @@ type DB interface {
 
 	Query(ctx context.Context, query string, args ...any) (pgx.Rows, error)
 	Exec(ctx context.Context, query string, args ...any) (pgconn.CommandTag, error)
-	QueryRow(ctx context.Context, query string, args ...any) (pgx.Row, error)
+	QueryRow(ctx context.Context, query string, args ...any) pgx.Row
 
 	Users() UserStore
 	// People() PeopleStore

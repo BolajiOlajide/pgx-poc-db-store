@@ -6,6 +6,7 @@ import (
 	"clevergo.tech/jsend"
 	"github.com/BolajiOlajide/pgx-poc-db-store/internal/database"
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 )
 
 type server struct {
@@ -36,7 +37,7 @@ func (s *server) setupRoutes() {
 	})
 	s.router.Route("/user", func(ir chi.Router) {
 		ir.Get("/", s.getUsers)
-		ir.Get("/{id}", s.getUser)
+		ir.Get("/{userID}", s.getUser)
 		ir.Post("/", s.createUser)
 		ir.Delete("/", s.deleteUser)
 	})
@@ -60,7 +61,25 @@ func (s *server) getUsers(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) getUser(w http.ResponseWriter, r *http.Request) {
-	jsend.Success(w, "hello user", http.StatusOK)
+	userID := chi.URLParam(r, "userID")
+	if userID == "" {
+		jsend.Error(w, "userID not provided", http.StatusBadRequest)
+		return
+	}
+
+	_, err := uuid.Parse(userID)
+	if err != nil {
+		jsend.Error(w, "invalid uuid", http.StatusBadRequest)
+		return
+	}
+
+	user, err := s.db.Users().Get(r.Context(), userID)
+	if err != nil {
+		jsend.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	jsend.Success(w, user, http.StatusOK)
 }
 
 func (s *server) createPeople(w http.ResponseWriter, r *http.Request) {

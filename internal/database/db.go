@@ -30,33 +30,15 @@ func (d *db) acquire(ctx context.Context) (*pgxpool.Conn, func(), error) {
 }
 
 func (d *db) Query(ctx context.Context, query string, args ...any) (pgx.Rows, error) {
-	conn, release, err := d.acquire(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer release()
-
-	return conn.Query(ctx, query, args...)
+	return d.Handle().Query(ctx, query, args...)
 }
 
 func (d *db) Exec(ctx context.Context, query string, args ...any) (pgconn.CommandTag, error) {
-	conn, release, err := d.acquire(ctx)
-	if err != nil {
-		return pgconn.CommandTag{}, err
-	}
-	defer release()
-
-	return conn.Exec(ctx, query, args...)
+	return d.Handle().Exec(ctx, query, args...)
 }
 
-func (d *db) QueryRow(ctx context.Context, query string, args ...any) (pgx.Row, error) {
-	conn, release, err := d.acquire(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer release()
-
-	return conn.QueryRow(ctx, query, args...), err
+func (d *db) QueryRow(ctx context.Context, query string, args ...any) pgx.Row {
+	return d.Handle().QueryRow(ctx, query, args...)
 }
 
 func (d *db) GetSQLDB() *sql.DB {

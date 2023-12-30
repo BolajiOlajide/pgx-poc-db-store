@@ -21,7 +21,7 @@ import (
 type TransactableHandle interface {
 	Query(ctx context.Context, query string, args ...any) (pgx.Rows, error)
 	Exec(ctx context.Context, query string, args ...any) (pgconn.CommandTag, error)
-	QueryRow(ctx context.Context, query string, args ...any) (pgx.Row, error)
+	QueryRow(ctx context.Context, query string, args ...any) pgx.Row
 
 	// InTransaction returns whether the handle represents a handle to a transaction.
 	InTransaction() bool
@@ -85,8 +85,8 @@ type dbHandle struct {
 	logger    *log.Logger
 }
 
-func (h *dbHandle) QueryRow(ctx context.Context, query string, args ...any) (pgx.Row, error) {
-	return h.Pool.QueryRow(ctx, query, args...), nil
+func (h *dbHandle) QueryRow(ctx context.Context, query string, args ...any) pgx.Row {
+	return h.Pool.QueryRow(ctx, query, args...)
 }
 
 func (h *dbHandle) InTransaction() bool {
@@ -233,11 +233,11 @@ func (t *lockingTx) Query(ctx context.Context, query string, args ...any) (pgx.R
 	return t.tx.Query(ctx, query, args...)
 }
 
-func (t *lockingTx) QueryRow(ctx context.Context, query string, args ...any) (pgx.Row, error) {
+func (t *lockingTx) QueryRow(ctx context.Context, query string, args ...any) pgx.Row {
 	t.lock()
 	defer t.unlock()
 
-	return t.tx.QueryRow(ctx, query, args...), nil
+	return t.tx.QueryRow(ctx, query, args...)
 }
 
 func (t *lockingTx) Commit(ctx context.Context) error {
