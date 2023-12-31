@@ -43,5 +43,15 @@ func createPgxPoolConfig(logger *log.Logger) *pgxpool.Config {
 		logger.Println("Closed the connection pool to the database!!")
 	}
 
+	dbConfig.BeforeConnect = func(ctx context.Context, cc *pgx.ConnConfig) error {
+		logger.Println("Before connecting to database")
+		return nil
+	}
+
+	dbConfig.AfterConnect = func(ctx context.Context, c *pgx.Conn) error {
+		logger.Println("after connecting to database!!")
+		return nil
+	}
+
 	return dbConfig
 }

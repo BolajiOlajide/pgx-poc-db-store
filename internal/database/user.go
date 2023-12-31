@@ -14,12 +14,16 @@ import (
 
 const defaultUserLimit = 10
 
-type UserNotFoundErr struct {
-	ID string
+type userNotFoundErr struct {
+	ID    string
+	Email string
 }
 
-func (e *UserNotFoundErr) Error() string {
-	return fmt.Sprintf("user with ID %s not found", e.ID)
+func (e userNotFoundErr) Error() string {
+	if e.ID != "" {
+		return fmt.Sprintf("user with ID %s not found", e.ID)
+	}
+	return fmt.Sprintf("user with email %s not found", e.Email)
 }
 
 var userColumns = []*sqlf.Query{
@@ -37,8 +41,9 @@ type UserStore interface {
 	basestore.ShareableStore
 
 	List(ctx context.Context, opts ListUserArgs) ([]*types.User, error)
-	Get(ctx context.Context, userID string) (*types.User, error)
-	// Create(ctx context.Context, user *types.User) error
+	GetByID(ctx context.Context, userID string) (*types.User, error)
+	GetByEmail(ctx context.Context, email string) (*types.User, error)
+	Create(ctx context.Context, email string, username string) (*types.User, error)
 }
 
 type ListUserArgs struct {
@@ -102,25 +107,74 @@ SELECT %s FROM users
 WHERE %s
 LIMIT 1`
 
-func (u *userStore) Get(ctx context.Context, userID string) (*types.User, error) {
+func (u *userStore) get(ctx context.Context, whereClause *sqlf.Query) (*types.User, error) {
+	q := sqlf.Sprintf(
+		getUserFmtStr,
+		sqlf.Join(userColumns, ", "),
+		whereClause,
+	)
+
+	return scanUser(u.QueryRow(ctx, q))
+}
+
+func (u *userStore) GetByID(ctx context.Context, userID string) (*types.User, error) {
 	if userID == "" {
 		return nil, errors.New("no user id provided")
 	}
 
-	q := sqlf.Sprintf(
-		getUserFmtStr,
-		sqlf.Join(userColumns, ", "),
-		sqlf.Sprintf("id = %s", userID),
-	)
-
-	user, err := scanUser(u.QueryRow(ctx, q))
+	user, err := u.get(ctx, sqlf.Sprintf("id = %s", userID))
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			return nil, &UserNotFoundErr{ID: userID}
+			return nil, userNotFoundErr{ID: userID}
 		}
 		return nil, err
 	}
 	return user, nil
+}
+
+func (u *userStore) GetByEmail(ctx context.Context, email string) (*types.User, error) {
+	if email == "" {
+		return nil, errors.New("no email provided")
+	}
+
+	user, err := u.get(ctx, sqlf.Sprintf("email = %s", email))
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, userNotFoundErr{Email: email}
+		}
+		return nil, err
+	}
+	return user, nil
+}
+
+const userCreateQueryFmtStr = `
+INSERT INTO
+	users (%s)
+	VALUES (
+		%s,
+		%s
+	)
+	RETURNING %s
+`
+
+func (u *userStore) Create(ctx context.Context, email string, username string) (*types.User, error) {
+	if email == "" {
+		return nil, errors.New("no email provided")
+	}
+
+	if username == "" {
+		return nil, errors.New("no username provided")
+	}
+
+	q := sqlf.Sprintf(
+		userCreateQueryFmtStr,
+		sqlf.Join(userInsertColumns, ", "),
+		username,
+		email,
+		sqlf.Join(userColumns, ", "),
+	)
+
+	return scanUser(u.QueryRow(ctx, q))
 }
 
 func scanUser(sc dbutil.Scanner) (*types.User, error) {
@@ -134,4 +188,9 @@ func scanUser(sc dbutil.Scanner) (*types.User, error) {
 	}
 
 	return &user, nil
+}
+
+func IsUserNotFoundErr(err error) bool {
+	_, ok := err.(userNotFoundErr)
+	return ok
 }

@@ -1,10 +1,14 @@
 package main
 
 import (
+	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 
 	"clevergo.tech/jsend"
 	"github.com/BolajiOlajide/pgx-poc-db-store/internal/database"
+	"github.com/BolajiOlajide/pgx-poc-db-store/internal/types"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
@@ -73,7 +77,7 @@ func (s *server) getUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := s.db.Users().Get(r.Context(), userID)
+	user, err := s.db.Users().GetByID(r.Context(), userID)
 	if err != nil {
 		jsend.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -82,12 +86,66 @@ func (s *server) getUser(w http.ResponseWriter, r *http.Request) {
 	jsend.Success(w, user, http.StatusOK)
 }
 
-func (s *server) createPeople(w http.ResponseWriter, r *http.Request) {
-	jsend.Success(w, "hello create people", http.StatusCreated)
+func (s *server) createUser(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Email    string `json:"email"`
+		Username string `json:"username"`
+	}
+	err := json.NewDecoder(r.Body).Decode(&body)
+	if err != nil {
+		jsend.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if body.Email == "" {
+		jsend.Error(w, "email is required", http.StatusBadRequest)
+		return
+	}
+
+	if body.Username == "" {
+		jsend.Error(w, "username is required", http.StatusBadRequest)
+		return
+	}
+
+	ctx := r.Context()
+	var newUser *types.User
+	status := http.StatusBadRequest
+	err = s.db.WithTransact(ctx, func(tx database.DB) error {
+		user, err := tx.Users().GetByEmail(ctx, body.Email)
+		if err != nil && !database.IsUserNotFoundErr(err) {
+			return err
+		}
+
+		if user != nil {
+			status = http.StatusConflict
+			return errors.New("user with that email exists")
+		}
+
+		newUser, err = tx.Users().Create(ctx, body.Email, body.Username)
+		if err != nil {
+			return err
+		}
+
+		fmt.Println("created user, ===>>", newUser.ID)
+
+		_, err = tx.People().Create(ctx, newUser.ID)
+		if err != nil {
+			return err
+		}
+
+		status = http.StatusOK
+		return nil
+	})
+	if err != nil {
+		jsend.Error(w, err.Error(), status)
+		return
+	}
+
+	jsend.Success(w, newUser, status)
 }
 
-func (s *server) createUser(w http.ResponseWriter, r *http.Request) {
-	jsend.Success(w, "hello create user", http.StatusCreated)
+func (s *server) createPeople(w http.ResponseWriter, r *http.Request) {
+	jsend.Success(w, "hello create people", http.StatusCreated)
 }
 
 func (s *server) deleteUser(w http.ResponseWriter, r *http.Request) {

@@ -12,7 +12,7 @@ import (
 )
 
 // local database so no cause for alarm
-var dsn = "postgres://sourcegraph:sourcegraph@localhost/pgx-test"
+var dsn = "postgres://sourcegraph:sourcegraph@localhost/pgx-test?application_name=pgx-test"
 
 type DB interface {
 	basestore.ShareableStore
@@ -22,7 +22,7 @@ type DB interface {
 	QueryRow(ctx context.Context, query string, args ...any) pgx.Row
 
 	Users() UserStore
-	// People() PeopleStore
+	People() PeopleStore
 
 	WithTransact(context.Context, func(tx DB) error) error
 	GetSQLDB() *sql.DB

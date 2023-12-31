@@ -58,3 +58,7 @@ func (d *db) WithTransact(ctx context.Context, f func(tx DB) error) error {
 func (d *db) Users() UserStore {
 	return UsersWith(d.Store)
 }
+
+func (d *db) People() PeopleStore {
+	return PeopleWith(d.Store)
+}
